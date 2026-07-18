@@ -13,6 +13,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -30,11 +33,8 @@ private object Routes {
     const val SYNC = "sync"
 }
 
-/**
- * Auth restore gate so we never flash Login while DataStore is still loading
- * a saved session (cold start / process death). Warm starts with an active in-memory
- * session skip straight to logged-in.
- */
+// Login is not in NavHost, so Back from Home cannot pop to Login.
+// Only logout sets LoggedOut.
 private enum class AuthBootstrap {
     Loading,
     LoggedOut,
@@ -45,19 +45,31 @@ private enum class AuthBootstrap {
 fun NavGraph() {
     val tokenStore = koinInject<TokenStore>()
     val sessionManager = koinInject<MiSessionManager>()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Warm resume: in-memory session still alive → skip Loading/Login entirely.
     var auth by remember {
         mutableStateOf(
             if (sessionManager.isActive) AuthBootstrap.LoggedIn else AuthBootstrap.Loading,
         )
     }
 
-    // One-shot restore. Do not key off Flow(token) with initial=null — that treats
-    // "not loaded yet" as "logged out" and flashes LoginScreen.
+    // Cold start: load saved credentials once.
     LaunchedEffect(Unit) {
         if (auth == AuthBootstrap.LoggedIn && sessionManager.isActive) return@LaunchedEffect
         auth = restoreAuth(sessionManager, tokenStore)
+    }
+
+    // Coming back to the app: keep LoggedIn if session is still active.
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            if (sessionManager.isActive) {
+                if (auth != AuthBootstrap.LoggedIn) auth = AuthBootstrap.LoggedIn
+                return@repeatOnLifecycle
+            }
+            if (auth == AuthBootstrap.LoggedIn) {
+                auth = restoreAuth(sessionManager, tokenStore)
+            }
+        }
     }
 
     when (auth) {
@@ -113,7 +125,11 @@ private suspend fun restoreAuth(
     if (sessionManager.isActive) return AuthBootstrap.LoggedIn
 
     val credentials = tokenStore.loadCredentials()
-    return if (credentials != null) {
+    return if (credentials != null &&
+        credentials.serviceToken.isNotBlank() &&
+        credentials.userId.isNotBlank() &&
+        credentials.ssecurity.isNotBlank()
+    ) {
         sessionManager.activate(credentials)
         AuthBootstrap.LoggedIn
     } else {

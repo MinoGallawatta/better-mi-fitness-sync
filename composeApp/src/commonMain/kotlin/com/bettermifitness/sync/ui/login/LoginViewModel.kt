@@ -209,7 +209,13 @@ class LoginViewModel(
         sessionManager.activate(credentials)
         credentialsStore.saveCredentials(credentials)
         _uiState.update {
-            it.copy(isLoading = false, loginSucceeded = true, errorMessage = null)
+            it.copy(
+                isLoading = false,
+                loginSucceeded = true,
+                errorMessage = null,
+                // Drop OTP/browser step so Back cannot reopen them after success.
+                step = LoginStep.Credentials,
+            )
         }
     }
 

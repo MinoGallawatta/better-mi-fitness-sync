@@ -70,10 +70,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     }
     val state by viewModel.uiState.collectAsState()
 
+    // Leave login before clearing the flag so Back cannot land on OTP/browser again.
     LaunchedEffect(state.loginSucceeded) {
         if (state.loginSucceeded) {
-            viewModel.consumeLoginSuccess()
             onLoginSuccess()
+            viewModel.consumeLoginSuccess()
         }
     }
 
@@ -95,14 +96,18 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             onVerify = viewModel::verifyOtp,
             onResend = viewModel::resendOtp,
             onTrouble = viewModel::goToBrowserFallback,
-            onBack = viewModel::goBackToCredentials,
+            onBack = {
+                if (!state.loginSucceeded) viewModel.goBackToCredentials()
+            },
         )
 
         LoginStep.BrowserFallback -> BrowserFallbackStep(
             isLoading = state.isLoading,
             errorMessage = state.errorMessage,
             onComplete = viewModel::completeBrowserLogin,
-            onBack = viewModel::goBackToCredentials,
+            onBack = {
+                if (!state.loginSucceeded) viewModel.goBackToCredentials()
+            },
         )
     }
 }
