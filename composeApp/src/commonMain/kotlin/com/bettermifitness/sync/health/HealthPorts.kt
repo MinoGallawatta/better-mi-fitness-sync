@@ -54,7 +54,7 @@ data class HealthReadiness(
                 hint
                     ?: "Install or open $serviceName on this phone so we can sync."
             !permissionsGranted ->
-                "Allow access to save steps, heart rate, sleep, and more in $serviceName."
+                "Tap Allow access so $serviceName can show the permission screen."
             else -> "You’re ready to sync."
         }
 }

@@ -55,9 +55,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- HC privacy / "why this app needs access" deep link -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
         </activity>
 
-        <!-- Required so Health Connect can show this app in the permissions UI -->
+        <!-- Required so Health Connect can show this app in App permissions -->
         <activity-alias
             android:name="ViewPermissionUsageActivity"
             android:exported="true"

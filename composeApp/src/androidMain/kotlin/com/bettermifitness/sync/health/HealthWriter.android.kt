@@ -2,6 +2,7 @@ package com.bettermifitness.sync.health
 
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.BloodPressureRecord
@@ -42,22 +43,37 @@ import java.time.ZoneOffset
 actual class HealthWriter(private val context: Context) : HealthStore {
     private val client by lazy { HealthConnectClient.getOrCreate(context) }
 
-    val requiredPermissions: Set<String> = setOf(
-        HealthPermission.getWritePermission(HeartRateRecord::class),
-        HealthPermission.getWritePermission(RestingHeartRateRecord::class),
-        HealthPermission.getWritePermission(SleepSessionRecord::class),
-        HealthPermission.getWritePermission(HcStepsRecord::class),
-        HealthPermission.getWritePermission(DistanceRecord::class),
-        HealthPermission.getWritePermission(ActiveCaloriesBurnedRecord::class),
-        HealthPermission.getWritePermission(OxygenSaturationRecord::class),
-        HealthPermission.getWritePermission(WeightRecord::class),
-        HealthPermission.getWritePermission(BodyFatRecord::class),
-        HealthPermission.getWritePermission(ExerciseSessionRecord::class),
-        HealthPermission.getWritePermission(BloodPressureRecord::class),
-        HealthPermission.getWritePermission(BodyTemperatureRecord::class),
-        HealthPermission.getWritePermission(SkinTemperatureRecord::class),
-        HealthPermission.getWritePermission(Vo2MaxRecord::class),
-    )
+    /**
+     * Write permissions for types this HC install supports.
+     * Older phones (e.g. Galaxy S8 + old Health Connect) may not expose skin temperature.
+     */
+    private fun availableWritePermissions(): Set<String> {
+        val perms = linkedSetOf(
+            HealthPermission.getWritePermission(HeartRateRecord::class),
+            HealthPermission.getWritePermission(RestingHeartRateRecord::class),
+            HealthPermission.getWritePermission(SleepSessionRecord::class),
+            HealthPermission.getWritePermission(HcStepsRecord::class),
+            HealthPermission.getWritePermission(DistanceRecord::class),
+            HealthPermission.getWritePermission(ActiveCaloriesBurnedRecord::class),
+            HealthPermission.getWritePermission(OxygenSaturationRecord::class),
+            HealthPermission.getWritePermission(WeightRecord::class),
+            HealthPermission.getWritePermission(BodyFatRecord::class),
+            HealthPermission.getWritePermission(ExerciseSessionRecord::class),
+            HealthPermission.getWritePermission(BloodPressureRecord::class),
+            HealthPermission.getWritePermission(BodyTemperatureRecord::class),
+            HealthPermission.getWritePermission(Vo2MaxRecord::class),
+        )
+        val skinOk = try {
+            client.features.getFeatureStatus(HealthConnectFeatures.FEATURE_SKIN_TEMPERATURE) ==
+                HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
+        } catch (_: Exception) {
+            false
+        }
+        if (skinOk) {
+            perms += HealthPermission.getWritePermission(SkinTemperatureRecord::class)
+        }
+        return perms
+    }
 
     actual override suspend fun writeHeartRate(samples: List<HeartRateSample>) {
         val sortedSamples = HealthDataNormalizer.normalizeHeartRate(samples)
@@ -382,8 +398,10 @@ actual class HealthWriter(private val context: Context) : HealthStore {
     actual override suspend fun hasWritePermissions(): Boolean {
         if (!isAvailable()) return false
         return try {
+            val needed = availableWritePermissions()
+            if (needed.isEmpty()) return false
             val granted = client.permissionController.getGrantedPermissions()
-            requiredPermissions.all { it in granted }
+            needed.all { it in granted }
         } catch (_: Exception) {
             false
         }
@@ -392,22 +410,33 @@ actual class HealthWriter(private val context: Context) : HealthStore {
     actual override suspend fun requestPermissions() {
         val launcher = HealthConnectPermissionBridge.requestPermissions
             ?: throw IllegalStateException("Health Connect permission launcher not ready")
-        val granted = launcher(requiredPermissions)
-        val missing = requiredPermissions - granted
+        val needed = availableWritePermissions()
+        if (needed.isEmpty()) {
+            throw Exception("Health Connect has no writable data types available on this phone.")
+        }
+        val granted = launcher(needed)
+        val missing = needed - granted
         if (missing.isNotEmpty()) {
-            throw Exception("Health Connect write permission not granted. Enable access and try again.")
+            throw Exception(
+                "Health Connect write permission not granted. " +
+                    "Tap Allow access in this app, then enable the toggles.",
+            )
         }
     }
 
-    actual override fun healthServiceName(): String = "Google Health Connect"
+    actual override fun healthServiceName(): String = "Health Connect"
 
     actual override suspend fun availabilityHint(): String? {
         return when (HealthConnectClient.getSdkStatus(context)) {
             HealthConnectClient.SDK_AVAILABLE ->
-                if (hasWritePermissions()) null
-                else "Please allow this app to save data in Health Connect. Tap Sync or open Health Connect."
+                if (hasWritePermissions()) {
+                    null
+                } else {
+                    "Tap Allow access so Health Connect can show the permission screen. " +
+                        "This app appears under App permissions after that request."
+                }
             HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
-                "Health Connect needs an update. Open the Play Store and update Health Connect."
+                "Update Health Connect from the Play Store, then try again."
             else ->
                 "Install Health Connect from the Play Store so we can save your activity."
         }
