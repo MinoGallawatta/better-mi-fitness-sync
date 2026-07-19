@@ -147,7 +147,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ -z \"${JAVA_HOME:-}\" ] || [ ! -d \"$JAVA_HOME\" ]; then\n  export JAVA_HOME=\"/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home\"\nfi\nexport PATH=\"$JAVA_HOME/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\ncd \"$SRCROOT/..\"\n# Needs Xcode env: PLATFORM_NAME, ARCHS, BUILT_PRODUCTS_DIR, UNLOCALIZED_RESOURCES_FOLDER_PATH\n./gradlew :composeApp:syncComposeResourcesForIos\n";
+			shellScript = "if [ -z \"${JAVA_HOME:-}\" ] || [ ! -d \"$JAVA_HOME\" ]; then\n  export JAVA_HOME=\"/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home\"\nfi\nexport PATH=\"$JAVA_HOME/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\ncd \"$SRCROOT/..\"\n./gradlew :composeApp:syncComposeResourcesForIos\n";
 		};
 		A7C27BF90D3F04E1A27C6728 /* Build Kotlin Framework */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -166,7 +166,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Prefer CI / env JAVA_HOME; fall back to Homebrew JDK 17 on local Macs.\nif [ -z \"${JAVA_HOME:-}\" ] || [ ! -d \"$JAVA_HOME\" ]; then\n  export JAVA_HOME=\"/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home\"\nfi\nexport PATH=\"$JAVA_HOME/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\ncd \"$SRCROOT/..\"\n# Device (iphoneos) vs Simulator — CI builds device for IPA download.\nif [ \"${PLATFORM_NAME:-}\" = \"iphoneos\" ]; then\n  ./gradlew :composeApp:linkDebugFrameworkIosArm64\nelse\n  ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64\nfi\n";
+			shellScript = "if [ -z \"${JAVA_HOME:-}\" ] || [ ! -d \"$JAVA_HOME\" ]; then\n  export JAVA_HOME=\"/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home\"\nfi\nexport PATH=\"$JAVA_HOME/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\ncd \"$SRCROOT/..\"\n# Match Xcode configuration: Release IPA must use releaseFramework (not debug).\nif [ \"${PLATFORM_NAME:-}\" = \"iphoneos\" ]; then\n  if [ \"${CONFIGURATION:-}\" = \"Release\" ]; then\n    ./gradlew :composeApp:linkReleaseFrameworkIosArm64\n  else\n    ./gradlew :composeApp:linkDebugFrameworkIosArm64\n  fi\nelse\n  if [ \"${CONFIGURATION:-}\" = \"Release\" ]; then\n    ./gradlew :composeApp:linkReleaseFrameworkIosSimulatorArm64\n  else\n    ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64\n  fi\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -194,8 +194,10 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_ENTITLEMENTS = iosApp.entitlements;
 				CODE_SIGN_IDENTITY = "-";
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework";
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Debug]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Release]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/releaseFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Debug]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Release]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/releaseFramework";
 				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Better Mi Fitness Sync";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
@@ -216,8 +218,10 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_ENTITLEMENTS = iosApp.entitlements;
 				CODE_SIGN_IDENTITY = "-";
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework";
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Debug]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Release]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/releaseFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Debug]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Release]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/releaseFramework";
 				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Better Mi Fitness Sync";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
@@ -267,8 +271,10 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework";
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Debug]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Release]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/releaseFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Debug]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Release]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/releaseFramework";
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -325,8 +331,10 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework";
-				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Debug]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Release]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/releaseFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Debug]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Release]" = "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/releaseFramework";
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;

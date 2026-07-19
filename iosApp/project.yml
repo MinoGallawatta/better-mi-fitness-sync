@@ -7,9 +7,11 @@ options:
 
 settings:
   base:
-    # Per-sdk paths so simulator never links the device ComposeApp binary (and vice versa).
-    "FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework"
-    "FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework"
+    # Per-sdk + Debug/Release so we never link the wrong ComposeApp binary.
+    "FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Debug]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework"
+    "FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Release]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/releaseFramework"
+    "FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Debug]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework"
+    "FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Release]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/releaseFramework"
 
 targets:
   BetterMiFitnessSync:
@@ -27,8 +29,10 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGNING_REQUIRED: "YES"
         CODE_SIGNING_ALLOWED: "YES"
-        "FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework"
-        "FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework"
+        "FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Debug]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework"
+        "FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*][config=Release]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/releaseFramework"
+        "FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Debug]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/debugFramework"
+        "FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*][config=Release]": "$(inherited) $(SRCROOT)/../composeApp/build/bin/iosArm64/releaseFramework"
         OTHER_LINKER_FLAGS: "$(inherited) -framework ComposeApp"
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
         SWIFT_VERSION: "5.9"
@@ -41,21 +45,27 @@ targets:
     preBuildScripts:
       - name: "Build Kotlin Framework"
         script: |
-          # Prefer CI / env JAVA_HOME; fall back to Homebrew JDK 17 on local Macs.
           if [ -z "${JAVA_HOME:-}" ] || [ ! -d "$JAVA_HOME" ]; then
             export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
           fi
           export PATH="$JAVA_HOME/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
           cd "$SRCROOT/.."
-          # Device (iphoneos) vs Simulator — CI builds device for IPA download.
+          # Match Xcode configuration: Release IPA must use releaseFramework (not debug).
           if [ "${PLATFORM_NAME:-}" = "iphoneos" ]; then
-            ./gradlew :composeApp:linkDebugFrameworkIosArm64
+            if [ "${CONFIGURATION:-}" = "Release" ]; then
+              ./gradlew :composeApp:linkReleaseFrameworkIosArm64
+            else
+              ./gradlew :composeApp:linkDebugFrameworkIosArm64
+            fi
           else
-            ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64
+            if [ "${CONFIGURATION:-}" = "Release" ]; then
+              ./gradlew :composeApp:linkReleaseFrameworkIosSimulatorArm64
+            else
+              ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64
+            fi
           fi
         basedOnDependencyAnalysis: false
-      # Static frameworks do not embed composeResources; copy them into the app
-      # product so painterResource works on iOS (avoids MissingResource white screen).
+      # Static frameworks do not embed composeResources; copy them into the app product.
       - name: "Sync Compose Resources"
         script: |
           if [ -z "${JAVA_HOME:-}" ] || [ ! -d "$JAVA_HOME" ]; then
@@ -63,6 +73,5 @@ targets:
           fi
           export PATH="$JAVA_HOME/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
           cd "$SRCROOT/.."
-          # Needs Xcode env: PLATFORM_NAME, ARCHS, BUILT_PRODUCTS_DIR, UNLOCALIZED_RESOURCES_FOLDER_PATH
           ./gradlew :composeApp:syncComposeResourcesForIos
         basedOnDependencyAnalysis: false

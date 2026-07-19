@@ -303,26 +303,28 @@ jobs:
       - name: Unit tests (composeApp)
         run: ./gradlew :composeApp:allTests --stacktrace --build-cache --configuration-cache
 
-      - name: Link Kotlin iOS device framework
-        run: ./gradlew :composeApp:linkDebugFrameworkIosArm64 --stacktrace --build-cache --configuration-cache
+      - name: Link Kotlin iOS device framework (Release)
+        run: ./gradlew :composeApp:linkReleaseFrameworkIosArm64 --stacktrace --build-cache --configuration-cache
 
       # Xcode DerivedData for Swift / link steps (secondary to Konan)
       - name: Cache Xcode DerivedData
         uses: actions/cache@v5
         with:
           path: iosApp/build/DerivedData
-          key: ${{ runner.os }}-dd-${{ hashFiles('iosApp/**', 'composeApp/build.gradle.kts', 'gradle/libs.versions.toml') }}-v3
+          key: ${{ runner.os }}-dd-rel-${{ hashFiles('iosApp/**', 'composeApp/build.gradle.kts', 'gradle/libs.versions.toml') }}-v4
           restore-keys: |
+            ${{ runner.os }}-dd-rel-v4-
             ${{ runner.os }}-dd-
 
-      - name: Build iOS app (unsigned, device arm64)
+      # Release only — Debug device builds ship .debug.dylib and crash when sideloaded.
+      - name: Build iOS app (unsigned Release, device arm64)
         working-directory: iosApp
         run: |
           set -euo pipefail
           xcodebuild \
             -project BetterMiFitnessSync.xcodeproj \
             -scheme BetterMiFitnessSync \
-            -configuration Debug \
+            -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             -derivedDataPath build/DerivedData \
@@ -339,13 +341,26 @@ jobs:
       - name: Package IPA
         run: |
           set -euo pipefail
-          APP=$(find iosApp/build/DerivedData/Build/Products -path "*iphoneos*/BetterMiFitnessSync.app" -type d | head -1)
-          test -n "$APP"
+          APP=$(find iosApp/build/DerivedData/Build/Products -path "*Release-iphoneos*/BetterMiFitnessSync.app" -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "Release app not found under DerivedData"
+            find iosApp/build/DerivedData/Build/Products -name '*.app' -type d || true
+            exit 1
+          fi
           echo "Using app: $APP"
+
+          # Guard against accidentally packaging a Debug app.
+          if [ -f "$APP/BetterMiFitnessSync.debug.dylib" ]; then
+            echo "Refusing to package Debug binary (BetterMiFitnessSync.debug.dylib present)"
+            exit 1
+          fi
+          case "$APP" in
+            *Debug*) echo "Refusing path that looks like Debug: $APP"; exit 1 ;;
+          esac
+
           mkdir -p Payload dist
           rm -rf Payload/*
           cp -R "$APP" Payload/
-          # Stable name for releases/latest/download/BetterMiFitnessSync.ipa
           zip -qry "dist/BetterMiFitnessSync.ipa" Payload
           if [ "${{ steps.version.outputs.is_release }}" = "true" ]; then
             NAME="BetterMiFitnessSync-${{ steps.version.outputs.version_name }}.ipa"
