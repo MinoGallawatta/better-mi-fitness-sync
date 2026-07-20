@@ -153,17 +153,19 @@ class MiDataClient(
 
     /**
      * Convenience: POST with a Map payload (auto-serialized to JSON).
+     * @param host override regional host (defaults to [healthHost])
      */
     suspend fun post(
         path: String,
         signPath: String = path,
         payload: Map<String, Any?>,
+        host: String = healthHost,
     ): JsonElement {
         val jsonPayload = json.encodeToString(
             kotlinx.serialization.json.JsonElement.serializer(),
             mapToJsonElement(payload),
         )
-        return encryptedPost(path = path, signPath = signPath, payload = jsonPayload)
+        return encryptedPost(host = host, path = path, signPath = signPath, payload = jsonPayload)
     }
 
     private fun buildCookieHeader(): String {
@@ -198,9 +200,7 @@ class MiDataClient(
             "iosPassportSDK/4.2.64 iOS/18.7.8 MK/aVBob25lMTQsMw== " +
             "DEVT/aVBob25l DEVS/aU9T BRA/QXBwbGU= L/en_US miHSTS"
 
-        private fun buildHealthHost(region: String): String = when (region) {
-            "cn" -> "hlth.io.mi.com"
-            else -> "$region.hlth.io.mi.com"
-        }
+        private fun buildHealthHost(region: String): String =
+            com.mifitness.miclient.auth.MiRegion.healthHost(region)
     }
 }

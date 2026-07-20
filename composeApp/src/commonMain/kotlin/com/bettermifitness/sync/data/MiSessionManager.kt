@@ -51,7 +51,18 @@ class MiSessionManager(
     }
 
     /**
+     * Rebuilds the in-memory client from persisted credentials (e.g. after region change).
+     * @return false if not signed in
+     */
+    suspend fun reloadFromStore(): Boolean {
+        val creds = credentialsStore.loadCredentials() ?: return false
+        activate(creds)
+        return true
+    }
+
+    /**
      * Uses passToken to obtain a new serviceToken, persists it, and re-activates the client.
+     * Region mode is applied in [CredentialsStore.saveCredentials] so manual override is kept.
      * @return true if refresh succeeded
      */
     suspend fun refreshSession(): Boolean {
@@ -60,7 +71,9 @@ class MiSessionManager(
         return try {
             val refreshed = miAuth.refreshWithPassToken(current)
             credentialsStore.saveCredentials(refreshed)
-            activate(refreshed)
+            // loadCredentials re-applies auto/manual effective region
+            val effective = credentialsStore.loadCredentials() ?: refreshed
+            activate(effective)
             true
         } catch (_: MiAuthException) {
             false

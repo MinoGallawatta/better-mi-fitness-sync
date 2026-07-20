@@ -2,6 +2,7 @@ package com.bettermifitness.sync.ui.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.bettermifitness.sync.data.MiRegionDiscovery
 import com.bettermifitness.sync.data.MiSessionManager
 import com.bettermifitness.sync.data.preferences.CredentialsStore
 import com.mifitness.miclient.auth.LoginResult
@@ -33,6 +34,7 @@ class LoginViewModel(
     private val miAuth: MiAuth,
     private val sessionManager: MiSessionManager,
     private val credentialsStore: CredentialsStore,
+    private val regionDiscovery: MiRegionDiscovery,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -208,6 +210,14 @@ class LoginViewModel(
     private suspend fun persistAndSucceed(credentials: MiCredentials) {
         sessionManager.activate(credentials)
         credentialsStore.saveCredentials(credentials)
+        // Pick the health cloud shard that actually holds the newest samples.
+        try {
+            val discovered = regionDiscovery.discover(credentials)
+            credentialsStore.setDiscoveredRegion(discovered)
+            sessionManager.reloadFromStore()
+        } catch (_: Exception) {
+            // Keep STS provisional region if probing fails entirely.
+        }
         _uiState.update {
             it.copy(
                 isLoading = false,

@@ -1,5 +1,6 @@
 package com.bettermifitness.sync.di
 
+import com.bettermifitness.sync.data.MiRegionDiscovery
 import com.bettermifitness.sync.data.MiSessionManager
 import com.bettermifitness.sync.data.preferences.CredentialsPort
 import com.bettermifitness.sync.data.preferences.CredentialsStore
@@ -37,6 +38,7 @@ fun commonAppModule(): Module = module {
     single { MiAuth() }
     single { MiSessionManager(credentialsStore = get(), miAuth = get()) }
     single<SyncSessionPort> { get<MiSessionManager>() }
+    single { MiRegionDiscovery() }
 
     // Platform module registers HealthWriter; bind ISP ports to the same instance.
     single<HealthStore> { get<HealthWriter>() }
@@ -57,7 +59,14 @@ fun commonAppModule(): Module = module {
         )
     }
 
-    factory { LoginViewModel(get(), get(), get()) }
+    factory {
+        LoginViewModel(
+            miAuth = get(),
+            sessionManager = get(),
+            credentialsStore = get(),
+            regionDiscovery = get(),
+        )
+    }
     factory { HomeViewModel(session = get(), tokenStore = get(), healthAvailability = get()) }
     factory {
         SyncViewModel(
@@ -67,5 +76,10 @@ fun commonAppModule(): Module = module {
             syncCoordinator = get(),
         )
     }
-    factory { SettingsViewModel(syncPreferences = get(), healthAvailability = get()) }
+    factory {
+        SettingsViewModel(
+            syncPreferences = get(),
+            healthAvailability = get(),
+        )
+    }
 }

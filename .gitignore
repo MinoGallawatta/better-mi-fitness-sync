@@ -43,6 +43,7 @@ xcuserdata/
 
 # Local research / decompiled official APK (large, not app source)
 apk-decompiled/
+apk-decompiled-cn/
 apk-extracted/
 
 # Local screenshots / ad-hoc captures (keep branding/ master icon)
