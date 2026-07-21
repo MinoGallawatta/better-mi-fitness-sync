@@ -55,3 +55,6 @@ ios-simulator-screenshot.png
 # Detekt
 detekt-baseline*.xml
 !config/detekt/baseline.xml
+
+# Local API capture / binary GPS research (may contain personal health data)
+research/

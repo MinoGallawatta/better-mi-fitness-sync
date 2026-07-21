@@ -130,6 +130,16 @@ data class WeightMeasurement(
 
 // --- Workouts ---
 
+/** One GPS track point for HealthKit / Health Connect workout routes. */
+@Serializable
+data class WorkoutRoutePoint(
+    val timeSec: Long,
+    val latitude: Double,
+    val longitude: Double,
+    val altitudeMeters: Double? = null,
+    val horizontalAccuracyMeters: Double? = null,
+)
+
 @Serializable
 data class WorkoutSession(
     val startTime: Long,
@@ -141,6 +151,16 @@ data class WorkoutSession(
     val avgHeartRateBpm: Int? = null,
     val maxHeartRateBpm: Int? = null,
     val totalSteps: Int? = null,
+    /** GPS route points (empty when indoor / download failed / no GPS file). */
+    val route: List<WorkoutRoutePoint> = emptyList(),
+    /**
+     * FDS GPS download keys from the sport report (not written to Health).
+     * Set when report `version > 0` so sync can fetch `fileType=2`.
+     */
+    val gpsDeviceSid: String? = null,
+    val gpsTimestampSec: Long? = null,
+    val gpsTzIn15Min: Int? = null,
+    val gpsProtoType: Int? = null,
 )
 
 @Serializable

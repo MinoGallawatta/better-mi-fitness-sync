@@ -2,6 +2,7 @@ package com.bettermifitness.sync.data.repository
 
 import com.bettermifitness.sync.data.MiSessionManager
 import com.bettermifitness.sync.data.api.HeartRateEntry
+import com.bettermifitness.sync.data.api.WorkoutSession
 import com.bettermifitness.sync.data.parse.MiFitnessParsers
 import com.bettermifitness.sync.data.parse.toRaw
 import com.bettermifitness.sync.data.preferences.SyncPreferences
@@ -166,11 +167,42 @@ class HealthRepository(
 
     suspend fun syncWorkouts(from: String, to: String) {
         runMetric("workouts") {
-            val sessions = MiFitnessParsers.parseWorkouts(
+            val parsed = MiFitnessParsers.parseWorkouts(
                 api.getSportRecordsByTime(from, to),
             )
+            val sessions = attachGpsRoutes(parsed)
             if (sessions.isNotEmpty()) healthWriter.writeWorkouts(sessions)
             sessions.size
+        }
+    }
+
+    /**
+     * Best-effort FDS GPS download per outdoor session. Failures leave [WorkoutSession.route] empty
+     * so the workout summary still syncs.
+     */
+    private suspend fun attachGpsRoutes(
+        sessions: List<WorkoutSession>,
+    ): List<WorkoutSession> {
+        return sessions.map { session ->
+            val sid = session.gpsDeviceSid
+            val ts = session.gpsTimestampSec
+            val tz = session.gpsTzIn15Min
+            val proto = session.gpsProtoType
+            if (sid.isNullOrBlank() || ts == null || tz == null || proto == null) {
+                return@map session
+            }
+            val points = try {
+                api.downloadSportGpsRoute(
+                    sid = sid,
+                    timeSec = ts,
+                    tzIn15Min = tz,
+                    protoType = proto,
+                )
+            } catch (_: Exception) {
+                emptyList()
+            }
+            if (points.isEmpty()) session
+            else session.copy(route = points)
         }
     }
 

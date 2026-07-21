@@ -273,6 +273,14 @@ object MiFitnessParsers {
                 ?: payload["type"]?.jsonPrimitive?.content
                 ?: payload["sport_name"]?.jsonPrimitive?.content
                 ?: "workout"
+            val version = payload["version"]?.jsonPrimitive?.intOrNull ?: 0
+            val protoType = payload["proto_type"]?.jsonPrimitive?.intOrNull
+                ?: payload["sport_type"]?.jsonPrimitive?.intOrNull
+            val did = payload["did"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            val tz = payload["timezone"]?.jsonPrimitive?.intOrNull
+            val gpsTime = payload["time"]?.jsonPrimitive?.longOrNull ?: startTs
+            // FDS GPS exists only when report version > 0 (Mi FitnessFDSDataGetter).
+            val canFetchGps = version > 0 && !did.isNullOrBlank() && protoType != null && tz != null
             WorkoutSession(
                 startTime = startTs,
                 endTime = endTs,
@@ -284,6 +292,10 @@ object MiFitnessParsers {
                 maxHeartRateBpm = payload["max_hrm"]?.jsonPrimitive?.intOrNull,
                 totalSteps = payload["steps"]?.jsonPrimitive?.intOrNull
                     ?: payload["total_steps"]?.jsonPrimitive?.intOrNull,
+                gpsDeviceSid = did.takeIf { canFetchGps },
+                gpsTimestampSec = gpsTime.takeIf { canFetchGps },
+                gpsTzIn15Min = tz.takeIf { canFetchGps },
+                gpsProtoType = protoType.takeIf { canFetchGps },
             )
         } catch (_: Exception) {
             null

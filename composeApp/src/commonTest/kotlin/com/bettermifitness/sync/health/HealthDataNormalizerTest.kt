@@ -114,3 +114,20 @@ class HealthDataNormalizerTest {
         assertTrue(HealthDataNormalizer.miSleepStageLabel(99) == "unknown")
     }
 }
+
+    @Test
+    fun normalizeRoute_filtersAndDedupes() {
+        val start = 1_700_000_000L
+        val end = 1_700_003_600L
+        val pts = listOf(
+            com.bettermifitness.sync.data.api.WorkoutRoutePoint(start + 10, -6.4, 106.75),
+            com.bettermifitness.sync.data.api.WorkoutRoutePoint(start + 10, -6.41, 106.76), // same second, last wins via distinctBy first? sorted then distinctBy keeps first
+            com.bettermifitness.sync.data.api.WorkoutRoutePoint(start + 20, 0.0, 0.0), // null island
+            com.bettermifitness.sync.data.api.WorkoutRoutePoint(start + 30, 91.0, 106.0), // invalid lat
+            com.bettermifitness.sync.data.api.WorkoutRoutePoint(start + 40, -6.42, 106.77),
+        )
+        val out = HealthDataNormalizer.normalizeRoute(pts, start, end)
+        assertEquals(2, out.size)
+        assertEquals(start + 10, out[0].timeSec)
+        assertEquals(start + 40, out[1].timeSec)
+    }

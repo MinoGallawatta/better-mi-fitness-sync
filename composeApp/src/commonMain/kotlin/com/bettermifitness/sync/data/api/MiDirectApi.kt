@@ -1,6 +1,9 @@
 package com.bettermifitness.sync.data.api
 
 import com.mifitness.miclient.api.MiDataClient
+import com.mifitness.miclient.fds.FdsClient
+import com.mifitness.miclient.gps.GpsPoint
+import com.mifitness.miclient.gps.SportGpsBinary
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.boolean
@@ -105,6 +108,42 @@ class MiDirectApi(private val client: MiDataClient) {
         }
         return all
     }
+
+    /**
+     * Downloads and parses sport GPS (FDS fileType=2) for one workout.
+     * Returns empty list on missing object / parse failure (caller should still write the session).
+     */
+    suspend fun downloadSportGpsRoute(
+        sid: String,
+        timeSec: Long,
+        tzIn15Min: Int,
+        protoType: Int,
+    ): List<WorkoutRoutePoint> {
+        val fds = FdsClient(client)
+        return try {
+            val bytes = fds.downloadSportGps(
+                FdsClient.SportGpsRequest(
+                    sid = sid,
+                    timeSec = timeSec,
+                    tzIn15Min = tzIn15Min,
+                    protoType = protoType,
+                ),
+            )
+            SportGpsBinary.parsePoints(bytes).map { it.toRoutePoint() }
+        } catch (_: Exception) {
+            emptyList()
+        } finally {
+            fds.close()
+        }
+    }
+
+    private fun GpsPoint.toRoutePoint(): WorkoutRoutePoint = WorkoutRoutePoint(
+        timeSec = timeSec,
+        latitude = latitude,
+        longitude = longitude,
+        altitudeMeters = altitude?.toDouble(),
+        horizontalAccuracyMeters = accuracy?.toDouble(),
+    )
 
     /**
      * Fetches user profile (decrypted from Mi's endpoint).

@@ -44,7 +44,10 @@ import platform.HealthKit.HKCategoryValueSleepAnalysisAsleepREM
 import platform.HealthKit.HKCategoryValueSleepAnalysisAsleepCore
 import platform.HealthKit.HKCategoryValueSleepAnalysisAwake
 import platform.HealthKit.HKCategoryValueSleepAnalysisInBed
+import platform.CoreLocation.CLLocation
+import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.HealthKit.HKWorkout
+import platform.HealthKit.HKWorkoutRouteBuilder
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -315,9 +318,9 @@ actual class HealthWriter : HealthStore {
         if (clean.isEmpty()) return
         val kcal = HKUnit.unitFromString("kcal")
         val meters = HKUnit.unitFromString("m")
-        val workouts = clean.map { w ->
+        for (w in clean) {
             val mapping = SportTypeMapper.map(w.activityType)
-            HKWorkout.workoutWithActivityType(
+            val workout = HKWorkout.workoutWithActivityType(
                 workoutActivityType = mapping.healthKitType.toULong(),
                 startDate = NSDate.dateWithTimeIntervalSince1970(w.startTime.toDouble()),
                 endDate = NSDate.dateWithTimeIntervalSince1970(w.endTime.toDouble()),
@@ -336,11 +339,60 @@ actual class HealthWriter : HealthStore {
                         mapping.title,
                         w.distanceMeters,
                         w.caloriesKcal,
+                        w.route.size,
                     ),
                 ),
             )
+            saveSamples(listOf(workout))
+            if (w.route.size >= 2) {
+                try {
+                    saveWorkoutRoute(workout, w.route)
+                } catch (_: Exception) {
+                    // Route is best-effort; workout already saved.
+                }
+            }
         }
-        saveSamples(workouts)
+    }
+
+    /**
+     * Attaches an [HKWorkoutRoute] via [HKWorkoutRouteBuilder] (requires CLLocation points).
+     */
+    private suspend fun saveWorkoutRoute(
+        workout: HKWorkout,
+        route: List<com.bettermifitness.sync.data.api.WorkoutRoutePoint>,
+    ) {
+        val locations = route.map { p ->
+            val date = NSDate.dateWithTimeIntervalSince1970(p.timeSec.toDouble())
+            val hAcc = p.horizontalAccuracyMeters ?: 10.0
+            val alt = p.altitudeMeters ?: 0.0
+            CLLocation(
+                coordinate = CLLocationCoordinate2DMake(p.latitude, p.longitude),
+                altitude = alt,
+                horizontalAccuracy = hAcc,
+                verticalAccuracy = if (p.altitudeMeters != null) 10.0 else -1.0,
+                timestamp = date,
+            )
+        }
+        val builder = HKWorkoutRouteBuilder(healthStore = healthStore, device = null)
+        suspendCoroutine { cont ->
+            builder.insertRouteData(locations) { success, error ->
+                if (!success) {
+                    cont.resumeWithException(
+                        Exception(error?.localizedDescription ?: "insertRouteData failed"),
+                    )
+                    return@insertRouteData
+                }
+                builder.finishRouteWithWorkout(workout, metadata = null) { _, finishError ->
+                    if (finishError != null) {
+                        cont.resumeWithException(
+                            Exception(finishError.localizedDescription ?: "finishRoute failed"),
+                        )
+                    } else {
+                        cont.resume(Unit)
+                    }
+                }
+            }
+        }
     }
 
     actual override suspend fun writeBloodPressure(samples: List<BloodPressureSample>) {
@@ -518,6 +570,7 @@ actual class HealthWriter : HealthStore {
         HKQuantityType.quantityTypeForIdentifier(HKQuantityTypeIdentifierVO2Max),
         HKCategoryType.categoryTypeForIdentifier(HKCategoryTypeIdentifierSleepAnalysis),
         platform.HealthKit.HKObjectType.workoutType(),
+        platform.HealthKit.HKSeriesType.workoutRouteType(),
     )
 
     private suspend fun saveSamples(samples: List<Any>) {

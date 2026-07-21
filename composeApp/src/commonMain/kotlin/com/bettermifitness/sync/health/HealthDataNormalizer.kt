@@ -11,6 +11,7 @@ import com.bettermifitness.sync.data.api.StepsRecord
 import com.bettermifitness.sync.data.api.TemperatureSample
 import com.bettermifitness.sync.data.api.Vo2MaxSample
 import com.bettermifitness.sync.data.api.WeightMeasurement
+import com.bettermifitness.sync.data.api.WorkoutRoutePoint
 import com.bettermifitness.sync.data.api.WorkoutSession
 
 /**
@@ -180,12 +181,47 @@ object HealthDataNormalizer {
                 avgHeartRateBpm = w.avgHeartRateBpm?.takeIf { it in 20..250 },
                 maxHeartRateBpm = w.maxHeartRateBpm?.takeIf { it in 20..250 },
                 totalSteps = w.totalSteps?.takeIf { it > 0 },
+                route = normalizeRoute(w.route, start, end),
+                // Keep FDS keys only for debugging/re-fetch; writers ignore them.
+                gpsDeviceSid = w.gpsDeviceSid,
+                gpsTimestampSec = w.gpsTimestampSec,
+                gpsTzIn15Min = w.gpsTzIn15Min,
+                gpsProtoType = w.gpsProtoType,
             )
         }
             .sortedBy { it.startTime }
             .associateBy { it.startTime }
             .values
             .sortedBy { it.startTime }
+
+    /**
+     * Drops invalid coords, sorts by time, clamps to session window, de-dupes same second.
+     */
+    fun normalizeRoute(
+        points: List<WorkoutRoutePoint>,
+        sessionStart: Long,
+        sessionEnd: Long,
+    ): List<WorkoutRoutePoint> {
+        if (points.isEmpty()) return emptyList()
+        val lo = sessionStart - 60
+        val hi = sessionEnd + 60
+        return points
+            .mapNotNull { p ->
+                val t = toEpochSeconds(p.timeSec)
+                if (!isPlausibleEpochSeconds(t) || t < lo || t > hi) return@mapNotNull null
+                if (p.latitude !in -90.0..90.0 || p.longitude !in -180.0..180.0) return@mapNotNull null
+                if (p.latitude == 0.0 && p.longitude == 0.0) return@mapNotNull null
+                WorkoutRoutePoint(
+                    timeSec = t,
+                    latitude = p.latitude,
+                    longitude = p.longitude,
+                    altitudeMeters = p.altitudeMeters?.takeIf { it in -500.0..9000.0 },
+                    horizontalAccuracyMeters = p.horizontalAccuracyMeters?.takeIf { it in 0.0..5000.0 },
+                )
+            }
+            .sortedBy { it.timeSec }
+            .distinctBy { it.timeSec }
+    }
 
     fun normalizeBloodPressure(samples: List<BloodPressureSample>): List<BloodPressureSample> =
         samples.mapNotNull { s ->

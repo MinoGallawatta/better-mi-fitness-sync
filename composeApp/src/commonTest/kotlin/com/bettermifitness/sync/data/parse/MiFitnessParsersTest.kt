@@ -185,6 +185,31 @@ class MiFitnessParsersTest {
         assertEquals("running", w.activityType)
         assertNear(5000.0, w.distanceMeters!!, tol = 0.1)
         assertEquals(145, w.avgHeartRateBpm)
+        // no version/did → no FDS GPS keys
+        assertEquals(null, w.gpsDeviceSid)
+    }
+
+    @Test
+    fun parseWorkout_extractsFdsGpsKeysWhenVersionPositive() {
+        val w = MiFitnessParsers.parseWorkout(
+            SportRecordEntry(
+                key = "outdoor_running",
+                category = "running",
+                time = 1_784_453_950L,
+                value = """
+                    {
+                      "start_time":1784453950,"end_time":1784457222,"duration":3272,
+                      "distance":5210,"calories":1000,"avg_hrm":150,
+                      "version":9,"proto_type":22,"timezone":28,"did":"xiaomiwear_app","time":1784453950
+                    }
+                """.trimIndent(),
+            ),
+        )
+        assertNotNull(w)
+        assertEquals("xiaomiwear_app", w.gpsDeviceSid)
+        assertEquals(1_784_453_950L, w.gpsTimestampSec)
+        assertEquals(28, w.gpsTzIn15Min)
+        assertEquals(22, w.gpsProtoType)
     }
 
     @Test

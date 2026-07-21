@@ -9,6 +9,7 @@ import androidx.health.connect.client.records.BloodPressureRecord
 import androidx.health.connect.client.records.BodyFatRecord
 import androidx.health.connect.client.records.BodyTemperatureRecord
 import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.ExerciseRoute
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.OxygenSaturationRecord
@@ -59,6 +60,7 @@ actual class HealthWriter(private val context: Context) : HealthStore {
             HealthPermission.getWritePermission(WeightRecord::class),
             HealthPermission.getWritePermission(BodyFatRecord::class),
             HealthPermission.getWritePermission(ExerciseSessionRecord::class),
+            HealthPermission.PERMISSION_WRITE_EXERCISE_ROUTE,
             HealthPermission.getWritePermission(BloodPressureRecord::class),
             HealthPermission.getWritePermission(BodyTemperatureRecord::class),
             HealthPermission.getWritePermission(Vo2MaxRecord::class),
@@ -266,27 +268,72 @@ actual class HealthWriter(private val context: Context) : HealthStore {
         if (clean.isEmpty()) return
         val records = clean.map { w ->
             val mapping = SportTypeMapper.map(w.activityType)
-            ExerciseSessionRecord(
-                startTime = Instant.ofEpochSecond(w.startTime),
-                endTime = Instant.ofEpochSecond(w.endTime),
-                startZoneOffset = ZoneOffset.UTC,
-                endZoneOffset = ZoneOffset.UTC,
-                exerciseType = mapping.healthConnectType,
-                title = mapping.title,
-                metadata = Metadata.manualEntry(
-                    clientRecordId = HealthRecordIds.workout(w.startTime),
-                    clientRecordVersion = HealthRecordIds.version(
-                        w.startTime,
-                        w.endTime,
-                        mapping.title,
-                        mapping.healthConnectType,
-                        w.distanceMeters,
-                        w.caloriesKcal,
+            val route = exerciseRouteOrNull(w)
+            if (route != null) {
+                ExerciseSessionRecord(
+                    startTime = Instant.ofEpochSecond(w.startTime),
+                    startZoneOffset = ZoneOffset.UTC,
+                    endTime = Instant.ofEpochSecond(w.endTime),
+                    endZoneOffset = ZoneOffset.UTC,
+                    metadata = Metadata.manualEntry(
+                        clientRecordId = HealthRecordIds.workout(w.startTime),
+                        clientRecordVersion = HealthRecordIds.version(
+                            w.startTime,
+                            w.endTime,
+                            mapping.title,
+                            mapping.healthConnectType,
+                            w.distanceMeters,
+                            w.caloriesKcal,
+                            w.route.size,
+                        ),
                     ),
-                ),
-            )
+                    exerciseType = mapping.healthConnectType,
+                    title = mapping.title,
+                    exerciseRoute = route,
+                )
+            } else {
+                ExerciseSessionRecord(
+                    startTime = Instant.ofEpochSecond(w.startTime),
+                    endTime = Instant.ofEpochSecond(w.endTime),
+                    startZoneOffset = ZoneOffset.UTC,
+                    endZoneOffset = ZoneOffset.UTC,
+                    exerciseType = mapping.healthConnectType,
+                    title = mapping.title,
+                    metadata = Metadata.manualEntry(
+                        clientRecordId = HealthRecordIds.workout(w.startTime),
+                        clientRecordVersion = HealthRecordIds.version(
+                            w.startTime,
+                            w.endTime,
+                            mapping.title,
+                            mapping.healthConnectType,
+                            w.distanceMeters,
+                            w.caloriesKcal,
+                            0,
+                        ),
+                    ),
+                )
+            }
         }
         client.insertRecords(records)
+    }
+
+    private fun exerciseRouteOrNull(w: WorkoutSession): ExerciseRoute? {
+        if (w.route.size < 2) return null
+        return try {
+            val locations = w.route.map { p ->
+                ExerciseRoute.Location(
+                    time = Instant.ofEpochSecond(p.timeSec),
+                    latitude = p.latitude,
+                    longitude = p.longitude,
+                    horizontalAccuracy = p.horizontalAccuracyMeters?.let { Length.meters(it) },
+                    verticalAccuracy = null,
+                    altitude = p.altitudeMeters?.let { Length.meters(it) },
+                )
+            }
+            ExerciseRoute(locations)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     actual override suspend fun writeSpO2(samples: List<SpO2Sample>) {

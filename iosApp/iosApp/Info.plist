@@ -38,7 +38,7 @@
 	<key>NSHealthShareUsageDescription</key>
 	<string>Better Mi Fitness Sync needs access to read your health data for sync verification.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Better Mi Fitness Sync writes your Mi Fitness health data (heart rate, sleep, workouts, steps, SpO2, blood pressure, temperature, VO2 max) to Apple Health.</string>
+	<string>Better Mi Fitness Sync writes your Mi Fitness health data (heart rate, sleep, workouts, GPS workout routes, steps, SpO2, blood pressure, temperature, VO2 max) to Apple Health.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIBackgroundModes</key>
