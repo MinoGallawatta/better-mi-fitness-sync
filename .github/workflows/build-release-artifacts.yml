@@ -439,7 +439,7 @@ jobs:
             echo "### Install"
             echo ""
             echo "- **Android:** [BetterMiFitnessSync.apk](https://github.com/${{ github.repository }}/releases/latest/download/BetterMiFitnessSync.apk) — enable install from unknown sources, then install."
-            echo "- **iOS:** [BetterMiFitnessSync.ipa](https://github.com/${{ github.repository }}/releases/latest/download/BetterMiFitnessSync.ipa) — **unsigned**; re-sign with Sideloadly / AltStore / Xcode before install."
+            echo "- **iOS:** [BetterMiFitnessSync.ipa](https://github.com/${{ github.repository }}/releases/latest/download/BetterMiFitnessSync.ipa) — **unsigned**; re-sign with a **paid Apple Developer** team that includes the **HealthKit** entitlement (free Apple ID sideloading is **not** enough)."
             echo ""
             if [ -n "$PREV" ]; then
               echo "### Changes since \`$PREV\`"

@@ -33,18 +33,32 @@ adb install -r BetterMiFitnessSync.apk
 
 ## Install on iOS
 
-CI builds an **unsigned** device IPA (no App Store or TestFlight signing). You re-sign and install with your own Apple ID tooling.
+CI builds an **unsigned** device IPA (no App Store or TestFlight signing). You must **re-sign** it with a signing identity that can use **HealthKit**.
+
+### HealthKit signing (important)
+
+This app needs the **HealthKit capability / entitlement** (`com.apple.developer.healthkit`). That is **not** available with a normal free Apple ID sideload the way many unsigned IPAs are installed.
+
+| Signing method | Works for this app? |
+|----------------|---------------------|
+| Free personal Apple ID only (typical Sideloadly / AltStore free tier) | **No** — HealthKit entitlement is not granted; install may fail or Health access will not work |
+| **Paid Apple Developer Program** team (individual or org), app signed with HealthKit enabled | **Yes** |
+| Xcode run from source with a paid team + HealthKit capability | **Yes** |
+| Enterprise / custom profiles that include HealthKit | Yes, if your org allows it |
+
+**Use a paid Apple Developer account** (or an equivalent certificate/profile that includes HealthKit). A free Apple ID is **not enough**.
+
+### Steps
 
 1. Download **[BetterMiFitnessSync.ipa](https://github.com/ilyasaftr/better-mi-fitness-sync/releases/latest/download/BetterMiFitnessSync.ipa)** from the latest release.
-2. Install with a sideload tool of your choice, for example:
-   - [Sideloadly](https://sideloadly.io/)
-   - AltStore / SideStore
-   - TrollStore (if your device supports it)
-   - Xcode (build and run from source with your team signing)
+2. Re-sign and install with a tool that uses your **paid Developer** certificate/profile, and keep the HealthKit entitlement, for example:
+   - [Sideloadly](https://sideloadly.io/) (with a paid team / proper cert — free ID is not enough)
+   - Xcode: open `iosApp`, select your **paid** team, ensure HealthKit capability is on, then build & run on a device
+   - Other re-sign workflows that inject HealthKit and use a valid provisioning profile
 3. On first launch, allow **Health** (HealthKit) access when prompted.
 4. Sign in with your **Mi Account**, pick what to sync, then run a sync.
 
-**Requirements:** Physical iPhone (HealthKit is not available on Simulator for real use). Free Apple ID sideloading typically lasts about 7 days. Paid Developer accounts last longer.
+**Requirements:** Physical iPhone for real HealthKit use. Signing must include the HealthKit entitlement (paid Developer Program or equivalent). Paid team installs last longer than free ad-hoc experiments; free Apple ID alone will not make Health sync work.
 
 ## What it does
 
