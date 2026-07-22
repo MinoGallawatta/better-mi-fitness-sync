@@ -24,6 +24,7 @@ import com.bettermifitness.sync.data.preferences.TokenStore
 import com.bettermifitness.sync.ui.home.HomeScreen
 import com.bettermifitness.sync.ui.login.LoginScreen
 import com.bettermifitness.sync.ui.settings.SettingsScreen
+import com.bettermifitness.sync.ui.strava.StravaConnectScreen
 import com.bettermifitness.sync.ui.sync.SyncScreen
 import org.koin.compose.koinInject
 
@@ -31,6 +32,7 @@ private object Routes {
     const val HOME = "home"
     const val SETTINGS = "settings"
     const val SYNC = "sync"
+    const val STRAVA_CONNECT = "strava_connect"
 }
 
 // Login is not in NavHost, so Back from Home cannot pop to Login.
@@ -106,11 +108,17 @@ fun NavGraph() {
                 composable(Routes.SETTINGS) {
                     SettingsScreen(
                         onBack = { navController.popBackStack() },
+                        onNavigateToStrava = { navController.navigate(Routes.STRAVA_CONNECT) },
                     )
                 }
                 composable(Routes.SYNC) {
                     SyncScreen(
                         onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(Routes.STRAVA_CONNECT) {
+                    StravaConnectScreen(
+                        onDone = { navController.popBackStack() },
                     )
                 }
             }

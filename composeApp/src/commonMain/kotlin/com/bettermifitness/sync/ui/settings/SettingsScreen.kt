@@ -44,6 +44,7 @@ import com.bettermifitness.sync.ui.components.StatusChip
 import com.bettermifitness.sync.ui.components.StatusTone
 import com.bettermifitness.sync.ui.icons.AppIcon
 import com.bettermifitness.sync.ui.icons.AppIcons
+import com.bettermifitness.sync.ui.strava.StravaConnectCard
 import org.koin.mp.KoinPlatform
 
 /**
@@ -52,7 +53,7 @@ import org.koin.mp.KoinPlatform
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onNavigateToStrava: () -> Unit) {
     val viewModel = remember { KoinPlatform.getKoin().get<SettingsViewModel>() }
     val state by viewModel.uiState.collectAsState()
     val healthName = state.healthServiceName.ifBlank { "Health" }
@@ -118,6 +119,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                 onRangeSelected = viewModel::setSyncRangeDays,
             )
             AutoSyncCard(state = state, onAutoSyncChange = viewModel::setAutoSync)
+
+            StravaConnectCard(onConnectClick = onNavigateToStrava)
 
             if (state.showShortcutsHelp) {
                 ShortcutsHelpCard()

@@ -7,6 +7,7 @@ import com.bettermifitness.sync.data.parse.MiFitnessParsers
 import com.bettermifitness.sync.data.parse.toRaw
 import com.bettermifitness.sync.data.preferences.SyncPreferences
 import com.bettermifitness.sync.health.HealthSampleWriter
+import com.bettermifitness.sync.strava.StravaWorkoutSyncer
 import com.mifitness.miclient.api.MiApiException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +43,7 @@ sealed class SyncState {
 class HealthRepository(
     private val session: MiSessionManager,
     private val healthWriter: HealthSampleWriter,
+    private val stravaWorkoutSyncer: StravaWorkoutSyncer,
 ) : HealthSyncRunner {
     private val _syncProgress = MutableStateFlow(SyncProgress())
     override val syncProgress: StateFlow<SyncProgress> = _syncProgress.asStateFlow()
@@ -179,6 +181,14 @@ class HealthRepository(
             val hrSamples = MiFitnessParsers.parseHeartRateSamples(hrRaw)
             val sessions = enrichWorkouts(parsed, hrSamples)
             if (sessions.isNotEmpty()) healthWriter.writeWorkouts(sessions)
+            // Isolated side effect: a Strava failure must never affect this metric's outcome.
+            if (sessions.isNotEmpty()) {
+                try {
+                    stravaWorkoutSyncer.pushIfNeeded(sessions)
+                } catch (_: Exception) {
+                    // pushIfNeeded already catches internally per-workout; last-resort guard.
+                }
+            }
             sessions.size
         }
     }

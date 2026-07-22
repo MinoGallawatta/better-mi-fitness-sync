@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeCompiler)
@@ -13,6 +15,15 @@ fun appVersionProp(name: String, envKey: String, default: String): String =
 val appVersionName: String = appVersionProp("versionName", "VERSION_NAME", "1.0.0")
 val appVersionCode: Int = appVersionProp("versionCode", "VERSION_CODE", "1").toInt()
 
+// Strava API app credentials for this personal build — never distributed, so it's safe to
+// ship a client_secret (see StravaConfig). Populate strava.clientId / strava.clientSecret
+// in the gitignored local.properties at the repo root; both default to "" if absent.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+fun stravaProp(key: String): String = localProperties.getProperty(key, "")
+
 android {
     namespace = "com.bettermifitness.sync"
     compileSdk = 36
@@ -23,10 +34,13 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
+        buildConfigField("String", "STRAVA_CLIENT_ID", "\"${stravaProp("strava.clientId")}\"")
+        buildConfigField("String", "STRAVA_CLIENT_SECRET", "\"${stravaProp("strava.clientSecret")}\"")
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {

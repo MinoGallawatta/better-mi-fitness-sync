@@ -15,6 +15,12 @@ import com.bettermifitness.sync.health.HealthPermissionRequester
 import com.bettermifitness.sync.health.HealthSampleWriter
 import com.bettermifitness.sync.health.HealthStore
 import com.bettermifitness.sync.health.HealthWriter
+import com.bettermifitness.sync.strava.StravaAuth
+import com.bettermifitness.sync.strava.StravaCredentialsStore
+import com.bettermifitness.sync.strava.StravaSessionManager
+import com.bettermifitness.sync.strava.StravaUploadApi
+import com.bettermifitness.sync.strava.StravaUploadLedger
+import com.bettermifitness.sync.strava.StravaWorkoutSyncer
 import com.bettermifitness.sync.sync.SyncCoordinator
 import com.bettermifitness.sync.ui.home.HomeViewModel
 import com.bettermifitness.sync.ui.login.LoginViewModel
@@ -46,7 +52,14 @@ fun commonAppModule(): Module = module {
     single<HealthAvailability> { get<HealthWriter>() }
     single<HealthPermissionRequester> { get<HealthWriter>() }
 
-    single { HealthRepository(get(), get<HealthSampleWriter>()) }
+    single { StravaCredentialsStore(get()) }
+    single { StravaAuth() }
+    single { StravaSessionManager(get(), get()) }
+    single { StravaUploadApi() }
+    single { StravaUploadLedger(get()) }
+    single { StravaWorkoutSyncer(get(), get(), get()) }
+
+    single { HealthRepository(get(), get<HealthSampleWriter>(), get()) }
     single<HealthSyncRunner> { get<HealthRepository>() }
     single {
         SyncCoordinator(
